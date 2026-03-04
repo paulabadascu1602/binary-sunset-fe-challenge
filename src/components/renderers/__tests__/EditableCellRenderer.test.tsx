@@ -105,6 +105,63 @@ describe('EditableCellRenderer', () => {
     });
   });
 
+  it('should propagate edits to dependent cells via refreshCells', () => {
+    const params = createMockParams(10, 'quantity');
+    const mockRefreshCells = jest.fn();
+    params.api.refreshCells = mockRefreshCells;
+    
+    render(<EditableCellRenderer {...params} />);
+
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: '50' } });
+
+    // Verify refreshCells is called to update dependent cells (subtotal, total, status)
+    expect(mockRefreshCells).toHaveBeenCalledWith({
+      rowNodes: [params.node],
+      force: true,
+    });
+    // This ensures dependent cells (calculated via valueGetter) will be recalculated
+  });
+
+  it('should update data immediately for numeric fields during typing', () => {
+    const params = createMockParams(10, 'unitPrice');
+    render(<EditableCellRenderer {...params} />);
+
+    const input = screen.getByRole('textbox');
+    
+    // Type a valid number
+    fireEvent.change(input, { target: { value: '25.5' } });
+
+    // Should update data immediately for numeric fields
+    expect(params.node.setData).toHaveBeenCalledWith(
+      expect.objectContaining({ unitPrice: 25.5 })
+    );
+    expect(params.api.refreshCells).toHaveBeenCalled();
+  });
+
+  it('should finalize value on blur and trigger final refresh', () => {
+    const params = createMockParams(10, 'quantity');
+    render(<EditableCellRenderer {...params} />);
+
+    const input = screen.getByRole('textbox');
+    
+    // Change value
+    fireEvent.change(input, { target: { value: '30' } });
+    
+    // Clear mocks to test blur separately
+    jest.clearAllMocks();
+    
+    // Blur should finalize and trigger refresh
+    fireEvent.blur(input);
+
+    expect(params.api.stopEditing).toHaveBeenCalled();
+    // refreshCells should be called on blur to ensure final recalculation
+    expect(params.api.refreshCells).toHaveBeenCalledWith({
+      rowNodes: [params.node],
+      force: true,
+    });
+  });
+
   it('should call api.stopEditing on blur', () => {
     const params = createMockParams(10, 'quantity');
     render(<EditableCellRenderer {...params} />);

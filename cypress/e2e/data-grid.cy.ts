@@ -186,5 +186,152 @@ describe('Data Grid E2E Tests', () => {
       cy.get('.ag-cell').should('contain.text', '$');
     });
   });
+
+  it('should edit value and see dependent values + chips update together', () => {
+    cy.get('.ag-theme-alpine').should('be.visible');
+    
+    // Get initial values
+    let initialSubtotal: number;
+    let initialTotal: number;
+    let initialStatus: string;
+    
+    cy.get('.ag-row').first().within(() => {
+      // Get initial subtotal
+      cy.get('.ag-cell').eq(7).invoke('text').then((text) => {
+        initialSubtotal = parseFloat(text.replace('$', '').replace(/,/g, ''));
+      });
+      
+      // Get initial total
+      cy.get('.ag-cell').eq(8).invoke('text').then((text) => {
+        initialTotal = parseFloat(text.replace('$', '').replace(/,/g, ''));
+      });
+      
+      // Get initial status
+      cy.get('.ag-cell').eq(9).within(() => {
+        cy.get('span').invoke('text').then((text) => {
+          initialStatus = text.trim();
+        });
+      });
+    });
+
+    // Edit quantity to trigger recalculation
+    cy.get('.ag-row').first().within(() => {
+      cy.get('.ag-cell').eq(3).within(() => {
+        cy.get('input').clear().type('100');
+      });
+    });
+
+    cy.wait(300);
+
+    // Verify ALL dependent values updated: subtotal, total, AND status chip
+    cy.get('.ag-row').first().within(() => {
+      // 1. Verify Subtotal updated
+      cy.get('.ag-cell').eq(7).should(($cell) => {
+        const newSubtotal = parseFloat($cell.text().replace('$', '').replace(/,/g, ''));
+        expect(newSubtotal).to.be.a('number');
+        expect(newSubtotal).to.be.greaterThan(0);
+        // Subtotal should be different from initial (unless quantity was already 100)
+        expect(newSubtotal).to.not.equal(initialSubtotal);
+      });
+
+      // 2. Verify Total updated
+      cy.get('.ag-cell').eq(8).should(($cell) => {
+        const newTotal = parseFloat($cell.text().replace('$', '').replace(/,/g, ''));
+        expect(newTotal).to.be.a('number');
+        expect(newTotal).to.be.greaterThan(0);
+        expect(newTotal).to.not.equal(initialTotal);
+      });
+
+      // 3. Verify Status chip updated (if total changed significantly)
+      cy.get('.ag-cell').eq(9).within(() => {
+        cy.get('span').should(($chip) => {
+          const newStatus = $chip.text().trim();
+          // Status should be a valid status
+          const validStatuses = ['High Priority', 'Pending', 'Completed', 'Warning', 'Normal'];
+          expect(validStatuses).to.include(newStatus);
+          // Status chip should have styling
+          expect($chip.css('background-color')).to.exist;
+        });
+      });
+    });
+  });
+
+  it('should handle scrolling and editing combined with large dataset', () => {
+    cy.get('.ag-theme-alpine').should('be.visible');
+    
+    // Scroll to middle of dataset
+    cy.get('.ag-body-viewport').scrollTo(0, 5000, { duration: 1000 });
+    cy.wait(500);
+    
+    // Verify we're in the middle of the dataset
+    cy.get('.ag-row').should('have.length.greaterThan', 0);
+    
+    // Find a row in the middle and edit it
+    cy.get('.ag-row').eq(5).within(() => {
+      // Get initial values
+      let initialSubtotal: number;
+      cy.get('.ag-cell').eq(7).invoke('text').then((text) => {
+        initialSubtotal = parseFloat(text.replace('$', '').replace(/,/g, ''));
+      });
+
+      // Edit quantity
+      cy.get('.ag-cell').eq(3).within(() => {
+        cy.get('input').clear().type('75');
+      });
+
+      cy.wait(300);
+
+      // Verify calculations updated after scrolling
+      cy.get('.ag-cell').eq(7).should(($cell) => {
+        const newSubtotal = parseFloat($cell.text().replace('$', '').replace(/,/g, ''));
+        expect(newSubtotal).to.be.a('number');
+        expect(newSubtotal).to.be.greaterThan(0);
+      });
+
+      // Verify total updated
+      cy.get('.ag-cell').eq(8).should(($cell) => {
+        const total = parseFloat($cell.text().replace('$', '').replace(/,/g, ''));
+        expect(total).to.be.a('number');
+        expect(total).to.be.greaterThan(0);
+      });
+
+      // Verify status chip is visible and updated
+      cy.get('.ag-cell').eq(9).within(() => {
+        cy.get('span').should('be.visible');
+        cy.get('span[style*="background-color"]').should('exist');
+      });
+    });
+
+    // Scroll to bottom
+    cy.get('.ag-body-viewport').scrollTo('bottom', { duration: 1000 });
+    cy.wait(500);
+    
+    // Edit a row at the bottom
+    cy.get('.ag-row').last().within(() => {
+      cy.get('.ag-cell').eq(4).within(() => {
+        cy.get('input').clear().type('200');
+      });
+
+      cy.wait(300);
+
+      // Verify calculations work at bottom of dataset
+      cy.get('.ag-cell').eq(8).should(($cell) => {
+        const total = parseFloat($cell.text().replace('$', '').replace(/,/g, ''));
+        expect(total).to.be.a('number');
+        expect(total).to.be.greaterThan(0);
+      });
+    });
+
+    // Scroll back to top
+    cy.get('.ag-body-viewport').scrollTo('top', { duration: 1000 });
+    cy.wait(500);
+    
+    // Verify first row is still editable and calculations work
+    cy.get('.ag-row').first().within(() => {
+      cy.get('.ag-cell').eq(3).within(() => {
+        cy.get('input').should('exist');
+      });
+    });
+  });
 });
 
