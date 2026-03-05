@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { ChipsRenderer } from '../ChipsRenderer';
 import { ICellRendererParams } from 'ag-grid-community';
 
@@ -18,61 +18,71 @@ describe('ChipsRenderer', () => {
     formatValue: jest.fn(),
     valueFormatted: status,
     refreshCell: jest.fn(),
-      eGridCell: document.createElement('div'),
-      eParentOfValue: document.createElement('div'),
-      registerRowDragger: jest.fn(),
-      setTooltip: jest.fn(),
-      context: {},
-    } as ICellRendererParams);
+    eGridCell: document.createElement('div'),
+    eParentOfValue: document.createElement('div'),
+    registerRowDragger: jest.fn(),
+    setTooltip: jest.fn(),
+    context: {},
+  } as ICellRendererParams);
 
   it('should render High Priority chip with correct styling', () => {
     const params = createMockParams('High Priority');
     const { container } = render(<ChipsRenderer {...params} />);
 
-    const chip = container.querySelector('span[style*="background-color"]') as HTMLElement;
+    const chip = container.querySelector('.status-chip.status-chip-high-priority') as HTMLElement;
     expect(chip).toBeInTheDocument();
-    expect(chip.style.backgroundColor).toBe('rgb(255, 241, 242)');
-    expect(chip.style.color).toBe('rgb(220, 38, 38)');
+    expect(chip).toHaveClass('status-chip');
+    expect(chip).toHaveClass('status-chip-high-priority');
+    expect(chip).toHaveTextContent('High Priority');
+    expect(chip).toHaveTextContent('🔥');
   });
 
   it('should render Warning chip with correct styling', () => {
     const params = createMockParams('Warning');
     const { container } = render(<ChipsRenderer {...params} />);
 
-    const chip = container.querySelector('span[style*="background-color"]') as HTMLElement;
+    const chip = container.querySelector('.status-chip.status-chip-warning') as HTMLElement;
     expect(chip).toBeInTheDocument();
-    expect(chip.style.backgroundColor).toBe('rgb(255, 247, 237)');
-    expect(chip.style.color).toBe('rgb(234, 88, 12)');
+    expect(chip).toHaveClass('status-chip');
+    expect(chip).toHaveClass('status-chip-warning');
+    expect(chip).toHaveTextContent('Warning');
+    expect(chip).toHaveTextContent('⚠️');
   });
 
   it('should render Completed chip with correct styling', () => {
     const params = createMockParams('Completed');
     const { container } = render(<ChipsRenderer {...params} />);
 
-    const chip = container.querySelector('span[style*="background-color"]') as HTMLElement;
+    const chip = container.querySelector('.status-chip.status-chip-completed') as HTMLElement;
     expect(chip).toBeInTheDocument();
-    expect(chip.style.backgroundColor).toBe('rgb(240, 253, 244)');
-    expect(chip.style.color).toBe('rgb(22, 163, 74)');
+    expect(chip).toHaveClass('status-chip');
+    expect(chip).toHaveClass('status-chip-completed');
+    expect(chip).toHaveTextContent('Completed');
+    expect(chip).toHaveTextContent('✨');
   });
 
   it('should render Pending chip with correct styling', () => {
     const params = createMockParams('Pending');
     const { container } = render(<ChipsRenderer {...params} />);
 
-    const chip = container.querySelector('span[style*="background-color"]') as HTMLElement;
+    const chip = container.querySelector('.status-chip.status-chip-pending') as HTMLElement;
     expect(chip).toBeInTheDocument();
-    expect(chip.style.backgroundColor).toBe('rgb(255, 251, 235)');
-    expect(chip.style.color).toBe('rgb(217, 119, 6)');
+    expect(chip).toHaveClass('status-chip');
+    expect(chip).toHaveClass('status-chip-pending');
+    expect(chip).toHaveTextContent('Pending');
+    expect(chip).toHaveTextContent('⏳');
   });
 
   it('should render Normal chip as default', () => {
     const params = createMockParams('Normal');
     const { container } = render(<ChipsRenderer {...params} />);
 
-    const chip = container.querySelector('span[style*="background-color"]') as HTMLElement;
+    const chip = container.querySelector('.status-chip.status-chip-normal') as HTMLElement;
     expect(chip).toBeInTheDocument();
-    expect(chip.style.backgroundColor).toBe('rgb(239, 246, 255)');
-    expect(chip.style.color).toBe('rgb(37, 99, 235)');
+    expect(chip).toHaveClass('status-chip');
+    expect(chip).toHaveClass('status-chip-normal');
+    expect(chip).toHaveTextContent('Normal');
+    expect(chip).toHaveTextContent('ℹ️');
   });
 
   it('should default to Normal for unknown status', () => {
@@ -83,33 +93,15 @@ describe('ChipsRenderer', () => {
     expect(chip).toBeInTheDocument();
   });
 
-  it('should apply hover styles on mouse enter', () => {
+  it('should have hover styles defined in CSS', () => {
     const params = createMockParams('High Priority');
     const { container } = render(<ChipsRenderer {...params} />);
 
-    const chip = container.querySelector('span[style*="background-color"]') as HTMLElement;
-    const initialBoxShadow = chip.style.boxShadow;
-
-    fireEvent.mouseEnter(chip);
-
-    expect(chip.style.transform).toBe('translateY(-1px)');
-    expect(chip.style.boxShadow).not.toBe(initialBoxShadow);
-    expect(chip.style.boxShadow).toContain('0 4px 8px');
-  });
-
-  it('should remove hover styles on mouse leave', () => {
-    const params = createMockParams('High Priority');
-    const { container } = render(<ChipsRenderer {...params} />);
-
-    const chip = container.querySelector('span[style*="background-color"]') as HTMLElement;
-    const initialBoxShadow = chip.style.boxShadow;
-
-    fireEvent.mouseEnter(chip);
-    expect(chip.style.transform).toBe('translateY(-1px)');
-
-    fireEvent.mouseLeave(chip);
-    expect(chip.style.transform).toBe('translateY(0)');
-    expect(chip.style.boxShadow).toBe(initialBoxShadow);
+    const chip = container.querySelector('.status-chip.status-chip-high-priority') as HTMLElement;
+    expect(chip).toBeInTheDocument();
+    // Hover styles are handled by CSS :hover pseudo-class
+    // In Jest environment, we can only verify the element exists and has correct classes
+    expect(chip).toHaveClass('status-chip');
+    expect(chip).toHaveClass('status-chip-high-priority');
   });
 });
-

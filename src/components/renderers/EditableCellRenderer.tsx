@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ICellRendererParams } from 'ag-grid-community';
+import { ICellRendererParams, CellValueChangedEvent } from 'ag-grid-community';
 
 interface EditableCellRendererParams extends ICellRendererParams {
   value: number | string;
@@ -7,6 +7,7 @@ interface EditableCellRendererParams extends ICellRendererParams {
     [key: string]: unknown;
   };
   field: string;
+  onCellValueChanged?: (event: CellValueChangedEvent) => void;
 }
 
 export const EditableCellRenderer: React.FC<EditableCellRendererParams> = ({
@@ -15,6 +16,7 @@ export const EditableCellRenderer: React.FC<EditableCellRendererParams> = ({
   field,
   api,
   node,
+  onCellValueChanged,
 }) => {
   // Keep as string during editing to allow user to clear the field
   const [editValue, setEditValue] = useState<string>(String(value || ''));
@@ -80,6 +82,29 @@ export const EditableCellRenderer: React.FC<EditableCellRendererParams> = ({
         force: true,
       });
       
+      // Manually trigger onCellValueChanged if available
+      // This is needed because node.setData() doesn't trigger onCellValueChanged automatically
+      if (onCellValueChanged && api && node) {
+        const mockEvent = {
+          data: updatedData,
+          node: node,
+          api: api,
+          column: {} as any,
+          colDef: {} as any,
+          value: finalValue,
+          newValue: finalValue,
+          oldValue: value,
+          rowIndex: node.rowIndex || 0,
+          rowPinned: null,
+          source: 'edit',
+          type: 'cellValueChanged',
+          columnApi: {} as any,
+          context: {},
+        } as CellValueChangedEvent;
+        
+        onCellValueChanged(mockEvent);
+      }
+      
       api.stopEditing();
     }
   };
@@ -94,13 +119,7 @@ export const EditableCellRenderer: React.FC<EditableCellRendererParams> = ({
       value={editValue}
       onChange={handleChange}
       onBlur={handleBlur}
-      style={{
-        width: '100%',
-        border: '1px solid #ccc',
-        borderRadius: '4px',
-        padding: '4px 8px',
-        fontSize: '14px',
-      }}
+      className="editable-cell-input"
     />
   );
 };

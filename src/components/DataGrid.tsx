@@ -1,6 +1,6 @@
-import React, { useMemo, useCallback, useState, useEffect } from 'react';
+import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import { ColDef, GridOptions, ValueGetterParams, CellValueChangedEvent, ICellRendererParams } from 'ag-grid-community';
+import { ColDef, GridOptions, ValueGetterParams, CellValueChangedEvent, ICellRendererParams, GridApi } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import '../App.css';
@@ -20,6 +20,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ rowData }) => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [totalFilterValue, setTotalFilterValue] = useState<string>('');
   const [totalFilterOperator, setTotalFilterOperator] = useState<'greater' | 'less'>('greater');
+  const gridApiRef = useRef<GridApi<DataRow> | null>(null);
 
   // Sync state with prop when rowData changes
   useEffect(() => {
@@ -61,6 +62,18 @@ export const DataGrid: React.FC<DataGridProps> = ({ rowData }) => {
 
     return result;
   }, [data, searchTerm, totalFilterValue, totalFilterOperator, calculateRowTotal]);
+
+  // Sync filteredData to grid when it changes (after edits or filter changes)
+  // This ensures the grid always reflects the latest filtered data
+  useEffect(() => {
+    if (gridApiRef.current) {
+      // Always update with a new array reference to force AG Grid to re-render
+      // This is critical when filters change after edits
+      gridApiRef.current.setGridOption('rowData', [...filteredData]);
+    }
+  }, [filteredData]);
+
+
 
   // Memoize value formatters and getters to prevent unnecessary re-renders
   const unitPriceFormatter = useCallback((params: { value?: number }) => {
@@ -104,10 +117,56 @@ export const DataGrid: React.FC<DataGridProps> = ({ rowData }) => {
     return params.value ? '✓' : '✗';
   }, []);
 
+  const handleCellValueChanged = useCallback((event: CellValueChangedEvent<DataRow>) => {
+    if (!event.data) return;
+
+    // IMPORTANT: event.data has the OLD values, event.node.data has the NEW values
+    // We need to use event.node.data which is updated by EditableCellRenderer
+    const currentRowData = event.node.data as DataRow;
+    
+    if (!currentRowData) {
+      // This should never happen since EditableCellRenderer sets node.data before triggering the event
+      return;
+    }
+    
+    // Recalculate the row with updated values (subtotal, total, status)
+    const updatedRow = recalculateRow(currentRowData);
+    
+    // Update the row data in AG Grid
+    event.node.setData(updatedRow);
+    
+    // CRITICAL: Update data state IMMEDIATELY to keep it in sync
+    // This ensures filteredData recalculates with the new values
+    setData((prevData) => {
+      const rowId = updatedRow.id;
+      // Create a completely new array and new row object to ensure React detects the change
+      return prevData.map((row) => 
+        row.id === rowId 
+          ? { ...updatedRow } // New object reference with all calculated values
+          : row
+      );
+    });
+    
+    // Refresh cells to show updated calculated values
+    event.api.refreshCells({
+      rowNodes: [event.node],
+      force: true,
+    });
+  }, []);
+
   // Memoize cellRendererParams objects
-  const quantityParams = useMemo(() => ({ field: 'quantity' }), []);
-  const unitPriceParams = useMemo(() => ({ field: 'unitPrice' }), []);
-  const discountParams = useMemo(() => ({ field: 'discount' }), []);
+  const quantityParams = useMemo(() => ({ 
+    field: 'quantity',
+    onCellValueChanged: handleCellValueChanged,
+  }), [handleCellValueChanged]);
+  const unitPriceParams = useMemo(() => ({ 
+    field: 'unitPrice',
+    onCellValueChanged: handleCellValueChanged,
+  }), [handleCellValueChanged]);
+  const discountParams = useMemo(() => ({ 
+    field: 'discount',
+    onCellValueChanged: handleCellValueChanged,
+  }), [handleCellValueChanged]);
 
   // Memoize column definitions to prevent unnecessary re-renders
   const columnDefs = useMemo<ColDef<DataRow>[]>(
@@ -217,21 +276,6 @@ export const DataGrid: React.FC<DataGridProps> = ({ rowData }) => {
     []
   );
 
-  const handleCellValueChanged = useCallback((event: CellValueChangedEvent<DataRow>) => {
-    if (!event.data) return;
-
-    const updatedRow = recalculateRow(event.data);
-    
-    // Update the row data
-    event.node.setData(updatedRow);
-    
-    // Refresh cells to show updated calculated values
-    event.api.refreshCells({
-      rowNodes: [event.node],
-      force: true,
-    });
-  }, []);
-
   // getRowId callback for immutable data updates (recommended by AG Grid)
   const getRowId = useCallback((params: { data: DataRow }) => {
     return params.data.id;
@@ -246,6 +290,9 @@ export const DataGrid: React.FC<DataGridProps> = ({ rowData }) => {
       headerHeight: 40,
       onCellValueChanged: handleCellValueChanged,
       getRowId,
+      onGridReady: (params) => {
+        gridApiRef.current = params.api;
+      },
     }),
     [handleCellValueChanged, getRowId]
   );
